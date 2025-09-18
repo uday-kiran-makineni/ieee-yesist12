@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Form Wallet</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 30px; }
+        h1 { margin-bottom: 20px; }
+        .form-list { margin-bottom: 30px; }
+        .form-item { padding: 10px; border: 1px solid #ccc; border-radius: 6px; margin-bottom: 10px; background: #f9f9f9; }
+        .form-item button { float: right; margin-left: 10px; }
+        .records { margin-top: 30px; }
+        .record { border-bottom: 1px solid #eee; padding: 8px 0; }
+    </style>
+</head>
+<body>
+    <h1>Form Wallet</h1>
+    <button onclick="window.location.href='form.html'" style="margin-bottom:20px;padding:10px 20px;background:#007bff;color:#fff;border:none;border-radius:5px;cursor:pointer;">Create Form</button>
+    <div class="form-list" id="formList"></div>
+    <div id="formError" style="color:red;margin-bottom:20px;"></div>
+    <div class="records" id="records"></div>
+    <script>
+        // Fetch all forms from backend
+        const formList = document.getElementById('formList');
+        const formError = document.getElementById('formError');
+        formList.innerHTML = '<p>Loading forms...</p>';
+        fetch('http://localhost:4000/form-template')
+            .then(res => {
+                if (!res.ok) throw new Error('Failed to fetch forms.');
+                return res.json();
+            })
+            .then(forms => {
+                formError.textContent = '';
+                if (forms.length === 0) {
+                    formList.innerHTML = '<p>No forms found. <a href="form.html">Create a new form</a></p>';
+                    return;
+                }
+                formList.innerHTML = '';
+                forms.forEach(form => {
+                    const div = document.createElement('div');
+                    div.className = 'form-item';
+                    div.innerHTML = `<strong>${form.title || 'Untitled Form'}</strong> <button onclick="showRecords(${form.id})">Show Records</button> <button onclick="editForm(${form.id})">Edit</button>`;
+                    formList.appendChild(div);
+                });
+            })
+            .catch(err => {
+                formList.innerHTML = '';
+                formError.textContent = err.message || 'An error occurred while loading forms.';
+            });
+
+        // Show all submissions for a form
+        window.showRecords = function(formId) {
+            const recordsDiv = document.getElementById('records');
+            recordsDiv.innerHTML = '<p>Loading submissions...</p>';
+            fetch(`http://localhost:4000/form-entry/${formId}`)
+                .then(res => {
+                    if (!res.ok) throw new Error('Failed to fetch submissions.');
+                    return res.json();
+                })
+                .then(records => {
+                    if (records.length === 0) {
+                        recordsDiv.innerHTML = '<p>No submissions for this form.</p>';
+                        return;
+                    }
+                    let html = `<h2>Submissions</h2>`;
+                    records.forEach((rec, idx) => {
+                        html += `<div class="record"><strong>Submission ${idx+1}:</strong><br>`;
+                        for (const key in rec.data) {
+                            html += `${key}: ${rec.data[key]}<br>`;
+                        }
+                        html += `</div>`;
+                    });
+                    recordsDiv.innerHTML = html;
+                })
+                .catch(err => {
+                    recordsDiv.innerHTML = `<p style="color:red;">${err.message || 'Error loading submissions.'}</p>`;
+                });
+        }
+
+        // Edit form (redirect to form.html with form id)
+        window.editForm = function(formId) {
+            window.location.href = `form.html?formId=${formId}`;
+        }
+    </script>
+</body>
+</html>

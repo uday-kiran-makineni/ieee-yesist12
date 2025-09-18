@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Form Builder Demo</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <link rel="stylesheet" href="https://code.jquery.com/ui/1.13.2/themes/base/jquery-ui.css">
+  <script src="https://code.jquery.com/ui/1.13.2/jquery-ui.min.js"></script>
+
+  <link rel="stylesheet" href="https://formbuilder.online/assets/css/form-builder.min.css">
+  <link rel="stylesheet" href="https://formbuilder.online/assets/css/form-render.min.css">
+  <script src="https://formbuilder.online/assets/js/form-builder.min.js"></script>
+  <script src="https://formbuilder.online/assets/js/form-render.min.js"></script>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+    }
+    #fb-editor, #fb-render {
+      border: 1px solid #ccc;
+      padding: 15px;
+      margin-bottom: 20px;
+      border-radius: 6px;
+      min-height: 200px;
+      background: #fafafa;
+    }
+    button {
+      padding: 10px 20px;
+      background: #007bff;
+      border: none;
+      color: white;
+      border-radius: 5px;
+      cursor: pointer;
+    }
+    button:hover {
+      background: #0056b3;
+    }
+  </style>
+</head>
+<body>
+
+  <h2>Form Builder</h2>
+  <div id="fb-editor"></div>
+  <button id="save-form">Save Form</button>
+
+
+
+  <script>
+
+    const fbEditor = document.getElementById('fb-editor');
+    // If editing, load form structure from backend
+
+    let formBuilderInstance;
+    async function loadFormForEdit() {
+      const params = new URLSearchParams(window.location.search);
+      const formId = params.get('formId');
+      if (formId) {
+        try {
+          const res = await fetch(`http://localhost:4000/form-template`);
+          const forms = await res.json();
+          const form = forms.find(f => f.id == formId);
+          if (form) {
+            formBuilderInstance = $(fbEditor).formBuilder({ formData: JSON.stringify(form.structure) });
+            return;
+          }
+        } catch (err) {
+          alert('Error loading form for edit.');
+        }
+      }
+      formBuilderInstance = $(fbEditor).formBuilder();
+    }
+    loadFormForEdit();
+
+    $('#save-form').click(async function () {
+      const params = new URLSearchParams(window.location.search);
+      const formId = params.get('formId');
+      // Get form data from the formBuilder instance
+      const formData = formBuilderInstance.actions.getData('json');
+      try {
+        let result;
+        if (formId) {
+          // Update existing form
+          const title = prompt('Update the title for your form:', 'Untitled Form');
+          const res = await fetch(`http://localhost:4000/form-template/${formId}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, structure: JSON.parse(formData) })
+          });
+          if (!res.ok) throw new Error('Failed to update form.');
+          result = await res.json();
+        } else {
+          // Create new form
+          const title = prompt('Enter a title for your form:', 'Untitled Form');
+          const res = await fetch('http://localhost:4000/form-template', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title, structure: JSON.parse(formData) })
+          });
+          if (!res.ok) throw new Error('Failed to save form.');
+          result = await res.json();
+        }
+        window.location.href = `display.html?formId=${result.id}`;
+      } catch (err) {
+        alert(err.message || 'Error saving form.');
+      }
+    });
+  </script>
+</body>
+</html>

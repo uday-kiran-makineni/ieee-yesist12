@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Form Data Display</title>
+</head>
+<body>
+    <h1>Rendered Form</h1>
+    <div id="renderedForm" style="margin-top:30px;"></div>
+    <div id="submitStatus" style="margin-top:20px;color:green;"></div>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+    <link rel="stylesheet" href="https://formbuilder.online/assets/css/form-render.min.css">
+    <script src="https://formbuilder.online/assets/js/form-render.min.js"></script>
+    <script>
+                // Get formId from URL
+                function getFormId() {
+                    const params = new URLSearchParams(window.location.search);
+                    return params.get('formId');
+                }
+                const formId = getFormId();
+                if (formId) {
+                    // Fetch form structure from backend
+                    fetch(`http://localhost:4000/form-template`)
+                        .then(res => res.json())
+                        .then(forms => {
+                            const form = forms.find(f => f.id == formId);
+                            if (!form) throw new Error('Form not found.');
+                            $('#renderedForm').formRender({ formData: JSON.stringify(form.structure) });
+                            setTimeout(function() {
+                                let $form = $('#renderedForm form');
+                                if ($form.length === 0) {
+                                    const fields = $('#renderedForm').children().detach();
+                                    $('#renderedForm').append($('<form></form>').append(fields));
+                                    $form = $('#renderedForm form');
+                                }
+                                if ($form.find('button[type="submit"]').length === 0) {
+                                    $form.append('<button type="submit" style="display:block;margin:20px auto 0 auto;">Submit</button>');
+                                }
+                                $form.find('button[type="submit"]').css({display:'block',margin:'20px auto 0 auto'});
+                                $form.off('submit').on('submit', async function(e) {
+                                    e.preventDefault();
+                                    const formArray = $(this).serializeArray();
+                                    const formObj = {};
+                                    formArray.forEach(function(item) {
+                                        formObj[item.name] = item.value;
+                                    });
+                                    // Save to backend
+                                    try {
+                                        const res = await fetch('http://localhost:4000/form-entry', {
+                                            method: 'POST',
+                                            headers: { 'Content-Type': 'application/json' },
+                                            body: JSON.stringify({ form_id: formId, data: formObj })
+                                        });
+                                        if (!res.ok) throw new Error('Failed to save submission.');
+                                        document.getElementById('submitStatus').textContent = 'Form data saved to database!';
+                                    } catch (err) {
+                                        document.getElementById('submitStatus').textContent = err.message || 'Error saving to database.';
+                                    }
+                                });
+                            }, 200);
+                        })
+                        .catch(err => {
+                            document.getElementById('renderedForm').innerHTML = `<p style="color:red;">${err.message || 'Error loading form.'}</p>`;
+                        });
+                } else {
+                    document.getElementById('renderedForm').innerHTML = '<p>No form selected.</p>';
+                }
+    </script>
+</body>
+</html>
