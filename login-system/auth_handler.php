@@ -10,12 +10,18 @@ if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
     exit(0);
 }
 
+// Debug logging
+error_log("Auth Handler Called - Method: " . $_SERVER['REQUEST_METHOD']);
+error_log("Request Headers: " . json_encode(getallheaders()));
+
 // Include configuration
 require_once 'config.php';
 
 try {
     $pdo = getDBConnection();
+    error_log("Database connection successful");
 } catch(Exception $e) {
+    error_log("Database connection failed: " . $e->getMessage());
     echo json_encode(['success' => false, 'message' => 'Database connection failed: ' . $e->getMessage()]);
     exit();
 }
@@ -23,6 +29,9 @@ try {
 // Get JSON input
 $input = json_decode(file_get_contents('php://input'), true);
 $action = $input['action'] ?? '';
+
+error_log("Action received: " . $action);
+error_log("Input data: " . json_encode($input));
 
 switch($action) {
     case 'signin':
@@ -87,36 +96,50 @@ function handleSignIn($pdo, $input) {
 }
 
 function handleSignUp($pdo, $input) {
+    error_log("=== SIGNUP PROCESS STARTED ===");
+    error_log("Input received: " . json_encode($input));
+    
     $email = $input['email'] ?? '';
     $password = $input['password'] ?? '';
     $fullName = $input['fullName'] ?? '';
     $phone = $input['phone'] ?? '';
     
+    error_log("Extracted data - Email: $email, FullName: $fullName, Phone: $phone");
+    
     if (empty($email) || empty($password) || empty($fullName) || empty($phone)) {
+        error_log("Validation failed: Missing required fields");
         echo json_encode(['success' => false, 'message' => 'All fields are required']);
         return;
     }
     
     if (strlen($password) < 8) {
+        error_log("Validation failed: Password too short");
         echo json_encode(['success' => false, 'message' => 'Password must be at least 8 characters long']);
         return;
     }
     
     try {
+        error_log("Starting database operations...");
+        
         // Check if user already exists
         $checkStmt = $pdo->prepare("SELECT id FROM users WHERE email = ?");
         $checkStmt->execute([$email]);
         
         if ($checkStmt->fetch()) {
+            error_log("User already exists with email: $email");
             echo json_encode(['success' => false, 'message' => 'User with this email already exists']);
             return;
         }
         
+        error_log("User doesn't exist, proceeding with creation...");
+        
         // Hash password
         $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
+        error_log("Password hashed successfully");
         
         // Generate verification token
         $verificationToken = bin2hex(random_bytes(32));
+        error_log("Verification token generated: " . substr($verificationToken, 0, 10) . "...");
         
         // Insert user
         $stmt = $pdo->prepare("
@@ -124,18 +147,33 @@ function handleSignUp($pdo, $input) {
             VALUES (?, ?, ?, ?, ?, NOW())
         ");
         
-        $stmt->execute([$email, $hashedPassword, $fullName, $phone, $verificationToken]);
+        error_log("Executing INSERT statement...");
+        $result = $stmt->execute([$email, $hashedPassword, $fullName, $phone, $verificationToken]);
         
-        // Send verification email (simulate)
-        sendVerificationEmail($email, $verificationToken);
-        
-        echo json_encode([
-            'success' => true, 
-            'message' => 'Account created successfully! Please check your email for verification.'
-        ]);
+        if ($result) {
+            $userId = $pdo->lastInsertId();
+            error_log("User inserted successfully with ID: $userId");
+            
+            // Send verification email (simulate)
+            sendVerificationEmail($email, $verificationToken);
+            
+            echo json_encode([
+                'success' => true, 
+                'message' => 'Account created successfully! Please check your email for verification.',
+                'userId' => $userId
+            ]);
+            error_log("=== SIGNUP PROCESS COMPLETED SUCCESSFULLY ===");
+        } else {
+            error_log("INSERT statement failed");
+            echo json_encode(['success' => false, 'message' => 'Failed to create account. Please try again.']);
+        }
         
     } catch (PDOException $e) {
+        error_log("Database error in signup: " . $e->getMessage());
         echo json_encode(['success' => false, 'message' => 'Database error: ' . $e->getMessage()]);
+    } catch (Exception $e) {
+        error_log("General error in signup: " . $e->getMessage());
+        echo json_encode(['success' => false, 'message' => 'An error occurred: ' . $e->getMessage()]);
     }
 }
 

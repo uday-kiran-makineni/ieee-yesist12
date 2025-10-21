@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signup Fix Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .test-section { background: #f8f9fa; padding: 20px; margin: 20px 0; border-radius: 8px; }
+        .result { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        button { background: #007bff; color: white; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; margin: 5px; }
+        button:hover { background: #0056b3; }
+        .form-group { margin: 15px 0; }
+        .form-input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 5px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Signup Data Storage Fix Test</h1>
+    
+    <div class="test-section">
+        <h3>Step 1: Server Connectivity Test</h3>
+        <button onclick="testConnectivity()">Test Server</button>
+        <div id="connectivity-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 2: Auth Handler Test</h3>
+        <button onclick="testAuthHandler()">Test Auth Handler</button>
+        <div id="auth-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 3: Database Connection Test</h3>
+        <button onclick="testDatabase()">Test Database</button>
+        <div id="database-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 4: Complete Signup Test</h3>
+        <div class="form-group">
+            <input type="email" id="testEmail" class="form-input" placeholder="Email" value="test@example.com">
+        </div>
+        <div class="form-group">
+            <input type="password" id="testPassword" class="form-input" placeholder="Password" value="TestPassword123!">
+        </div>
+        <div class="form-group">
+            <input type="text" id="testFullName" class="form-input" placeholder="Full Name" value="Test User">
+        </div>
+        <div class="form-group">
+            <input type="tel" id="testPhone" class="form-input" placeholder="Phone" value="+1234567890">
+        </div>
+        <button onclick="testSignup()">Test Complete Signup</button>
+        <div id="signup-result"></div>
+    </div>
+
+    <div class="test-section">
+        <h3>Step 5: Check Database Records</h3>
+        <button onclick="checkDatabase()">Check Database Records</button>
+        <div id="check-result"></div>
+    </div>
+
+    <script>
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="result ${type}">${message}</div>`;
+        }
+
+        function showResultWithDetails(elementId, message, details, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `
+                <div class="result ${type}">
+                    ${message}
+                    <pre>${JSON.stringify(details, null, 2)}</pre>
+                </div>
+            `;
+        }
+
+        async function testConnectivity() {
+            showResult('connectivity-result', '🔄 Testing server connectivity...', 'info');
+            
+            try {
+                const response = await fetch('test_endpoint.php');
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResult('connectivity-result', '✅ Server is accessible and responding', 'success');
+                } else {
+                    showResult('connectivity-result', '❌ Server responded but with error', 'error');
+                }
+            } catch (error) {
+                showResultWithDetails('connectivity-result', '❌ Server connectivity failed', {
+                    error: error.message,
+                    type: error.name
+                }, 'error');
+            }
+        }
+
+        async function testAuthHandler() {
+            showResult('auth-result', '🔄 Testing auth handler...', 'info');
+            
+            try {
+                const response = await fetch('auth_handler.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ action: 'test' })
+                });
+                
+                const result = await response.json();
+                showResultWithDetails('auth-result', '✅ Auth handler is responding', result, 'success');
+            } catch (error) {
+                showResultWithDetails('auth-result', '❌ Auth handler error', {
+                    error: error.message,
+                    type: error.name
+                }, 'error');
+            }
+        }
+
+        async function testDatabase() {
+            showResult('database-result', '🔄 Testing database connection...', 'info');
+            
+            try {
+                const response = await fetch('system_check.php');
+                const result = await response.json();
+                
+                if (result.status === 'success') {
+                    showResultWithDetails('database-result', '✅ Database connection working', result, 'success');
+                } else {
+                    showResultWithDetails('database-result', '❌ Database connection failed', result, 'error');
+                }
+            } catch (error) {
+                showResultWithDetails('database-result', '❌ Database test error', {
+                    error: error.message,
+                    type: error.name
+                }, 'error');
+            }
+        }
+
+        async function testSignup() {
+            showResult('signup-result', '🔄 Testing complete signup process...', 'info');
+            
+            const email = document.getElementById('testEmail').value + '_' + Date.now();
+            const password = document.getElementById('testPassword').value;
+            const fullName = document.getElementById('testFullName').value;
+            const phone = document.getElementById('testPhone').value;
+            
+            const signupData = {
+                action: 'signup',
+                email: email,
+                password: password,
+                fullName: fullName,
+                phone: phone
+            };
+            
+            try {
+                const response = await fetch('auth_handler.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(signupData)
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showResultWithDetails('signup-result', '✅ Signup successful! Data should be stored in database.', {
+                        request: signupData,
+                        response: result
+                    }, 'success');
+                } else {
+                    showResultWithDetails('signup-result', '❌ Signup failed', {
+                        request: signupData,
+                        response: result
+                    }, 'error');
+                }
+            } catch (error) {
+                showResultWithDetails('signup-result', '❌ Signup network error', {
+                    request: signupData,
+                    error: error.message,
+                    type: error.name
+                }, 'error');
+            }
+        }
+
+        async function checkDatabase() {
+            showResult('check-result', '🔄 Checking database records...', 'info');
+            
+            try {
+                const response = await fetch('check_existing_db.php');
+                const text = await response.text();
+                
+                if (text.includes('✅')) {
+                    showResult('check-result', '✅ Database check completed. See detailed output above.', 'success');
+                } else {
+                    showResult('check-result', '⚠️ Database check completed with warnings. See output above.', 'info');
+                }
+            } catch (error) {
+                showResultWithDetails('check-result', '❌ Database check error', {
+                    error: error.message,
+                    type: error.name
+                }, 'error');
+            }
+        }
+
+        // Auto-run tests on page load
+        window.addEventListener('load', function() {
+            console.log('🚀 Starting automatic tests...');
+            setTimeout(() => {
+                testConnectivity();
+                setTimeout(() => testDatabase(), 1000);
+                setTimeout(() => testAuthHandler(), 2000);
+            }, 500);
+        });
+    </script>
+</body>
+</html>

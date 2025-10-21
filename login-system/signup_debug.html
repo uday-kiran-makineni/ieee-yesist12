@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Signup Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .form-group { margin: 15px 0; }
+        .form-label { display: block; margin-bottom: 5px; font-weight: bold; }
+        .form-input { width: 100%; padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+        .submit-button { background: #007bff; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; }
+        .submit-button:disabled { background: #6c757d; }
+        .result { padding: 10px; margin: 10px 0; border-radius: 5px; }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Signup Debug Test</h1>
+    <p>This is a simplified signup form to test the network connection issue.</p>
+
+    <form id="debugSignupForm">
+        <div class="form-group">
+            <label class="form-label">Email:</label>
+            <input type="email" id="email" class="form-input" value="test@example.com" required>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Password:</label>
+            <input type="password" id="password" class="form-input" value="TestPassword123!" required>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Full Name:</label>
+            <input type="text" id="fullName" class="form-input" value="Test User" required>
+        </div>
+
+        <div class="form-group">
+            <label class="form-label">Phone:</label>
+            <input type="tel" id="phone" class="form-input" value="+1234567890" required>
+        </div>
+
+        <button type="submit" class="submit-button" id="submitBtn">Test Signup</button>
+    </form>
+
+    <div id="result"></div>
+    <div id="debugInfo"></div>
+
+    <script>
+        function showResult(message, type = 'info') {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = `<div class="result ${type}">${message}</div>`;
+        }
+
+        function showDebugInfo(info) {
+            const debugDiv = document.getElementById('debugInfo');
+            debugDiv.innerHTML = `<div class="result info"><h4>Debug Info:</h4><pre>${JSON.stringify(info, null, 2)}</pre></div>`;
+        }
+
+        document.getElementById('debugSignupForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Testing...';
+            
+            // Collect form data
+            const formData = {
+                action: 'signup',
+                email: document.getElementById('email').value,
+                password: document.getElementById('password').value,
+                fullName: document.getElementById('fullName').value,
+                phone: document.getElementById('phone').value
+            };
+
+            showDebugInfo({
+                step: 'Form data collected',
+                data: formData,
+                timestamp: new Date().toISOString()
+            });
+
+            try {
+                showResult('Sending request to server...', 'info');
+                
+                const response = await fetch('auth_handler.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(formData)
+                });
+
+                showDebugInfo({
+                    step: 'Response received',
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries(response.headers),
+                    url: response.url
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+
+                showDebugInfo({
+                    step: 'JSON parsed',
+                    result: result
+                });
+
+                if (result.success) {
+                    showResult('✅ Signup successful! ' + result.message, 'success');
+                } else {
+                    showResult('⚠️ Signup failed: ' + result.message, 'error');
+                }
+
+            } catch (error) {
+                showResult('❌ Network Error: ' + error.message, 'error');
+                
+                showDebugInfo({
+                    step: 'Error caught',
+                    error: {
+                        name: error.name,
+                        message: error.message,
+                        stack: error.stack
+                    },
+                    possibleCauses: [
+                        'Server not running',
+                        'Wrong URL/path',
+                        'CORS issues',
+                        'PHP syntax error',
+                        'Database connection issue'
+                    ]
+                });
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Test Signup';
+            }
+        });
+
+        // Auto-test server connectivity on page load
+        window.addEventListener('load', async function() {
+            try {
+                const response = await fetch('system_check.php');
+                const result = await response.json();
+                if (result.status === 'success') {
+                    showResult('✅ Server is running and database is connected', 'success');
+                } else {
+                    showResult('⚠️ Server running but there may be issues', 'info');
+                }
+            } catch (error) {
+                showResult('❌ Cannot connect to server: ' + error.message, 'error');
+            }
+        });
+    </script>
+</body>
+</html>
