@@ -49,23 +49,34 @@ define('UPLOAD_PATH', 'uploads/');
 // Utility function to get database connection
 function getDBConnection() {
     try {
-        $pdo = new PDO(
-            "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME,
-            DB_USER,
-            DB_PASS,
-            [
-                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
-                PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
-                PDO::ATTR_EMULATE_PREPARES => false,
-            ]
-        );
+        // First check if required extensions are loaded
+        if (!extension_loaded('pdo_mysql')) {
+            throw new Exception('PDO MySQL extension is not loaded. Please enable it in php.ini');
+        }
+        
+        $dsn = "mysql:host=" . DB_HOST . ";dbname=" . DB_NAME . ";charset=utf8mb4";
+        $options = [
+            PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+            PDO::ATTR_EMULATE_PREPARES => false,
+            PDO::MYSQL_ATTR_INIT_COMMAND => "SET NAMES utf8mb4"
+        ];
+        
+        $pdo = new PDO($dsn, DB_USER, DB_PASS, $options);
         return $pdo;
     } catch (PDOException $e) {
         if (DEBUG_MODE) {
-            throw $e;
+            throw new Exception("Database connection failed: " . $e->getMessage());
         } else {
             error_log("Database connection failed: " . $e->getMessage());
-            return false;
+            throw new Exception("Database connection failed. Please try again later.");
+        }
+    } catch (Exception $e) {
+        if (DEBUG_MODE) {
+            throw $e;
+        } else {
+            error_log("Database setup error: " . $e->getMessage());
+            throw new Exception("Database setup error. Please contact administrator.");
         }
     }
 }
