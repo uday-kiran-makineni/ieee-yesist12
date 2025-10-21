@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Login with Existing Database</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 600px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .form-group {
+            margin-bottom: 15px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 16px;
+        }
+        button {
+            background: #007bff;
+            color: white;
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            width: 100%;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        .response {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+            display: none;
+        }
+        .success {
+            background: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+        .info {
+            background: #f0f8ff;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border-left: 4px solid #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="test-container">
+        <h1>🧪 Test Login with Your Existing Database</h1>
+        
+        <div class="info">
+            <h3>📋 Testing Steps:</h3>
+            <ol>
+                <li>First run <a href="check_existing_db.php" target="_blank">Database Check</a></li>
+                <li>Use the test credentials below</li>
+                <li>Click "Test Login" to verify authentication</li>
+                <li>If successful, go to the main <a href="index.html">Login Page</a></li>
+            </ol>
+        </div>
+
+        <form id="testLoginForm">
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" name="email" value="test@yesist12.com" required>
+            </div>
+
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" name="password" value="password123" required>
+            </div>
+
+            <button type="submit">🔐 Test Login</button>
+        </form>
+
+        <div id="response" class="response"></div>
+
+        <div style="margin-top: 30px;">
+            <h3>🔗 Quick Links:</h3>
+            <p>
+                <a href="check_existing_db.php" style="background: #17a2b8; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; margin-right: 10px;">🔍 Check Database</a>
+                <a href="index.html" style="background: #28a745; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px;">🏠 Main Login Page</a>
+            </p>
+        </div>
+    </div>
+
+    <script>
+        document.getElementById('testLoginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+            const responseDiv = document.getElementById('response');
+            
+            // Show loading state
+            responseDiv.style.display = 'block';
+            responseDiv.className = 'response';
+            responseDiv.innerHTML = '⏳ Testing login...';
+            
+            try {
+                const response = await fetch('auth_handler.php', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        action: 'signin',
+                        email: email,
+                        password: password
+                    })
+                });
+                
+                const result = await response.json();
+                
+                responseDiv.style.display = 'block';
+                
+                if (result.success) {
+                    responseDiv.className = 'response success';
+                    responseDiv.innerHTML = `
+                        <h3>✅ Login Successful!</h3>
+                        <p><strong>Message:</strong> ${result.message}</p>
+                        <p>Your authentication system is working correctly with the existing database!</p>
+                        <p><a href="index.html" style="background: #28a745; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px;">Go to Main Login Page</a></p>
+                    `;
+                } else {
+                    responseDiv.className = 'response error';
+                    responseDiv.innerHTML = `
+                        <h3>❌ Login Failed</h3>
+                        <p><strong>Error:</strong> ${result.message}</p>
+                        <p>Please check the database setup or credentials.</p>
+                    `;
+                }
+                
+            } catch (error) {
+                responseDiv.style.display = 'block';
+                responseDiv.className = 'response error';
+                responseDiv.innerHTML = `
+                    <h3>❌ Connection Error</h3>
+                    <p><strong>Error:</strong> ${error.message}</p>
+                    <p>Check if the PHP server is running and auth_handler.php is accessible.</p>
+                `;
+            }
+        });
+    </script>
+</body>
+</html>
