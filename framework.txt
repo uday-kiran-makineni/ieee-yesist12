@@ -1,0 +1,968 @@
+He5 Framework v1.0.4 - Internal Documentation
+ PROPRIETARY SOFTWARE - HE5 INTERNAL &
+SERVICES USE 
+© He5. All rights reserved.
+This software is proprietary and confidential. Unauthorized copying, distribution, or modification is strictly prohibited.
+Usage Terms:
+• Only authorized He5 teams, employees, or partners may use this
+code
+• Allowed for He5 internal applications and He5-created services/products
+• Redistribution outside the permitted scope is forbidden
+• Please contact He5 for permissions or licensing questions
+• Report issues or request access via the internal support channel
+Table of Contents
+1. Overview
+2. Architecture
+3. Installation & Setup
+4. Core Components
+5. Routing System
+6. Middleware System
+7. Authentication & Authorization
+8. Database Integration
+9. View System
+10. Security Features
+11. Logging System
+12. File Upload System
+13. API Development
+14. Best Practices
+15. Examples
+16. Troubleshooting
+Overview
+He5 Framework is a proprietary PHP framework designed for He5 internal
+projects and He5-created services/products. It provides a comprehensive set
+1
+of tools for routing, middleware, authentication, database management, and
+more.
+ff HE5 INTERNAL & SERVICES USE - This framework is for authorized He5 use and He5-created services only.
+Key Features
+• MVC Architecture: Clean separation of concerns
+• RESTful API Support: Built-in API routing and JSON responses
+• Middleware System: Flexible request/response processing
+• Authentication: Multiple auth methods (session, token, OAuth)
+• Security: CSRF protection, input validation, encryption
+• Logging: Comprehensive logging system
+• Database: PDO-based database abstraction
+• Views: Template rendering system
+• File Handling: Complete file upload and management system
+Architecture
+Framework Structure
+He5-Frame-work-1.0.4.phar
+ UserInterface/
+  Router.php # Core routing system
+  View.php # Template rendering
+  He5Exception.php # Custom exceptions
+  MiddlewareInterface.php
+  CommonConstants.php
+  He5ED.php # Encryption utilities
+  IAMUtil.php # Identity & Access Management
+ Logger/
+  Logger.php # Logging system
+ files/
+  He5FilesUtil.php # File utilities
+ He5FrameWorkAPI.php # Main API class
+Application Structure
+project/
+ main.php # Application entry point
+ config.php # Configuration
+ He5-Frame-work-1.0.4.phar
+ src/
+  Controllers/ # Business logic
+  Middleware/ # Request processing
+2
+  Views/ # Templates
+ public_html/ # Web root
+ index.php # Web entry point
+Installation & Setup
+1. Basic Setup
+<?php
+declare(strict_types=1);
+//  HE5 INTERNAL & SERVICES USE - He5 Framework
+// Unauthorized access and usage is strictly prohibited
+// Define framework path
+if (!defined('FRAMEWORKPATH')) {
+define("FRAMEWORKPATH", __DIR__ . "/He5-Frame-work-1.0.4.phar");
+}
+// Include framework
+include_once FRAMEWORKPATH;
+// Include configuration
+require_once __DIR__ . "/config.php";
+2. .htaccess Configuration
+Create a .htaccess file in your web root directory:
+RewriteEngine On
+# Handle Authorization Header
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+# If the requested filename exists, serve it
+RewriteCond %{REQUEST_FILENAME} -f
+RewriteRule ^ - [L]
+# If the requested directory exists, serve it
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+# Block direct access to all PHP files except index.php
+RewriteCond %{REQUEST_URI} !^/index\.php$
+RewriteRule ^(.+)\.php$ - [F,L]
+3
+# Otherwise, redirect all requests to index.php
+RewriteRule ^(.*)$ index.php [QSA,L]
+# PHP Configuration
+php_value upload_max_filesize 10M
+php_value post_max_size 10M
+php_value max_execution_time 300
+php_value memory_limit 256M
+# Enable error reporting for development (disable in production)
+# php_flag display_errors On
+# php_flag log_errors On
+# Optional: Force HTTPS (uncomment for production)
+# RewriteCond %{HTTPS} off
+# RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+# Optional: Remove trailing slashes
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^(.*)/$ /$1 [R=301,L]
+3. Web Server Configuration
+Apache Configuration
+# Virtual Host Configuration
+<VirtualHost *:80>
+ServerName your-domain.com
+DocumentRoot /path/to/your/project/public_html
+<Directory /path/to/your/project/public_html>
+AllowOverride All
+Require all granted
+</Directory>
+# Logging
+ErrorLog /var/log/apache2/your-domain-error.log
+CustomLog /var/log/apache2/your-domain-access.log combined
+</VirtualHost>
+Nginx Configuration
+server {
+listen 80;
+server_name your-domain.com;
+root /path/to/your/project/public_html;
+4
+index index.php;
+# Security headers
+add_header X-Content-Type-Options nosniff;
+add_header X-Frame-Options DENY;
+add_header X-XSS-Protection "1; mode=block";
+# PHP handling
+location ~ \.php$ {
+fastcgi_pass unix:/var/run/php/php8.1-fpm.sock;
+fastcgi_index index.php;
+include fastcgi_params;
+fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+}
+# URL rewriting
+location / {
+try_files $uri $uri/ /index.php?$query_string;
+}
+# Block access to sensitive files
+location ~ \.(phar|log)$ {
+deny all;
+}
+location ~ /(He5-PHP-FrameWork|logs|temp)/ {
+deny all;
+}
+}
+4. Web Entry Point (index.php)
+Create the main entry point for your application:
+<?php
+// public_html/index.php
+<?php
+declare(strict_types=1);
+include_once __DIR__.'/../main.php';
+/*
+| He5 PHPFramework — Internal Use Only
+|
+| © He5. All rights reserved.
+| This software is proprietary and confidential.
+| Unauthorized copying, distribution, or modification is strictly prohibited.
+5
+|
+| Usage Terms:
+| - Only authorized teams, employees, or partners may use this code.
+| - Redistribution outside the permitted scope is forbidden.
+| - Please contact He5 for permissions or licensing questions.
+|
+| Key Notes:
+| - Minimal bootstrapping (single `main.php` entry)
+| - Simple routing helpers for rapid app development
+| - Optimized for internal enterprise workflows
+|
+| Contact:
+| Report issues or request access via the internal support channel.
+|
+*/
+5. Configuration (config.php)
+<?php
+//  HE5 INTERNAL & SERVICES USE - He5 Framework Configuration
+// Unauthorized access and usage is strictly prohibited
+include_once FRAMEWORKPATH;
+// Database Configuration
+define_once("DB_HOST", '127.0.0.1');
+define_once("DB_NAME", 'your_database');
+define_once("DB_USERNAME", 'username');
+define_once("DB_PASSWORD", 'password');
+define_once("MYSQL_UTCTIMEZONE", 'UTC');
+// Application Configuration
+define_once("SITE_PATH", 'http://localhost/your-app');
+define_once("BASE_DIR_PATH", "your-app/public_html");
+define_once("PHP_TIMEZONE", 'Asia/Kolkata');
+define_once("LOGS_PATH","path");
+// Security Keys
+define_once("TOKEN_ENCRYPTION_KEY", 'your-encryption-key');
+define_once("DB_KEY", "your-db-key");
+define_once("PRIVATE_KEY", "your-private-key");
+// IAM Configuration - Only for He5 Accounts connected applications
+define_once("IAM_PATH", "https://your-iam-server.com");
+define_once("IAM_AUTH_HEAD_KEY", "your-iam-auth-key");
+6
+// SMTP Configuration
+define_once("SMTP_HOST", "your-smtp-host");
+define_once("SMTP_PORT", 465);
+define_once("SMTP_USERNAME", "your-email");
+define_once("SMTP_PASSWORD", "your-password");
+define_once("SMTP_ENCRYPTION", "ssl");
+3. Application Entry Point (main.php)
+<?php
+//  HE5 INTERNAL & SERVICES USE - He5 Framework
+// Unauthorized access and usage is strictly prohibited
+// Define framework path
+if (!defined('FRAMEWORKPATH')) {
+define("FRAMEWORKPATH", __DIR__ . "/../He5-Frame-work-1.0.4.phar");
+}
+// Include framework
+include_once FRAMEWORKPATH;
+// Include configuration
+require_once __DIR__ . "/config.php";
+// Include your application files
+require_once __DIR__ . "/src/Controllers/UserController.php";
+require_once __DIR__ . "/src/Controllers/ApiController.php";
+require_once __DIR__ . "/src/Middleware/AuthMiddleware.php";
+// Initialize logger
+$logger = new Logger(__DIR__ . LOGS_PATH);
+// Create router instance
+$router = new Router(__DIR__ . "/src/Views/", $logger);
+// Define your routes here
+$router->addPage("/", [$userController, 'homePage']);
+$router->addPage("/dashboard", [$userController, 'dashboardPage'], [$authMiddleware]);
+$router->post('/api/users', [$apiController, 'createUser'], [$authMiddleware], $userParams);/ Handle the request
+$router->close();
+7
+Core Components
+1. Router Class
+The Router is the heart of the framework, handling all HTTP requests and
+responses.
+class Router
+{
+private static ?Router $instance = null;
+private View $view;
+private Logger $logger;
+private PDO $dbConn;
+private array $params = [];
+private string $csrf_token;
+public function __construct(string $viewsPath = "", Logger $logger = new Logger())
+public function addPage(string $path, string|array $handler, array $middleware = []): vopublic function get(string $path, array $handler, array $middleware = [], array $paramsRpublic function post(string $path, array $handler, array $middleware = [], array $paramspublic function put(string $path, array $handler, array $middleware = [], array $paramsRpublic function delete(string $path, array $handler, array $middleware = [], array $parapublic function close(): void
+// Static methods
+public static function getInstance(): Router
+public static function LOGGER(): Logger
+public static function DB(): PDO
+// Session management
+public function getUserId(): ?int
+public function getSessionId(): ?int
+public function getSessionReference(): ?string
+public function hasUserCredentials(): bool
+}
+2. He5 Utility Class
+Core utility functions for common operations.
+class He5
+{
+public static function redirect(string $url, bool $newTab = false): void
+public static function getCurrentUrl(): string
+public static function getParamValue(string $paramName): mixed
+public static function getParamArray(): array
+public static function getParamCount(): int
+public static function trimString(string $string, int $length): string
+8
+public static function removeQueryParam(string $url, string $paramToRemove): string
+}
+3. He5Exception Class
+Custom exception handling with HTTP status codes.
+class He5Exception extends Exception
+{
+private int $errorCode;
+private string $errorMessage;
+private int $httpCode;
+public function __construct(string $errorMessage = "Internal Server Error", int $errorCopublic function getErrorCode(): int
+public function getErrorMessage(): string
+public function getHttpCode(): int
+}
+4. He5FilesUtil Class
+File handling utilities for uploads, downloads, and file management.
+class He5FilesUtil
+{
+public static function downloadCsv(string $dataArray, string $filename): void
+public static function saveUploadedFile(array $fileData, string $uploadDir, string $filepublic static function deleteFile(string $filePath): bool
+public static function getFileInfo(string $filePath): array
+public static function createThumbnail(string $sourcePath, string $thumbnailPath, int $mpublic static function validateFileSize(int $fileSize, int $maxSize): bool
+public static function validateFileType(string $filePath, array $allowedTypes): bool
+public static function formatFileSize(int $bytes): string
+}
+Routing System
+1. Page Routes (GET)
+For rendering HTML pages:
+// Simple page route
+$router->addPage("/dashboard", [$userController, 'dashboardPage'], [$pathLoginAuth]);
+// Page with parameters
+$router->addPage("/user/{id}", [$userController, 'userProfilePage'], [$pathLoginAuth]);
+9
+// Direct file inclusion
+$router->addPage("/about", "about.php");
+2. API Routes
+For JSON API endpoints:
+// GET API
+$router->get('api/user/{id}', [$userController, 'getUser'], [$apiLoginAuth]);
+// POST API
+$router->post('api/user/create', [$userController, 'createUser'], [$apiLoginAuth], $userPara// PUT API
+$router->put('api/user/{id}', [$userController, 'updateUser'], [$apiLoginAuth], $userParams)// DELETE API
+$router->delete('api/user/{id}', [$userController, 'deleteUser'], [$apiLoginAuth]);
+3. Route Parameters
+Define parameter validation:
+$userParams = [
+"name" => new Param(Security::STRING_REGEX, true, 50),
+"email" => new Param(Security::STRING_REGEX, true, Security::MAIL_ID_LENGTH),
+"age" => new Param(Security::INT_VALUE, false, 3)
+];
+$router->post('api/user', [$controller, 'createUser'], [$middleware], $userParams);
+4. Route Matching
+The framework supports dynamic route matching:
+// Route: /user/{id}/posts/{post_id}
+// URL: /user/123/posts/456
+// Parameters: ['id' => '123', 'post_id' => '456']
+Middleware System
+1. Middleware Interface
+All middleware must implement this interface:
+interface MiddlewareInterface
+{
+10
+public function handle(): bool;
+}
+2. Built-in Middleware
+Authentication Middleware
+class PageLoginAuth implements MiddlewareInterface
+{
+public function handle(): bool
+{
+if (!AuthUtil::isUserLoggedIn()) {
+He5::redirect(SITE_PATH."/login?redirect=".urlencode(He5::getCurrentUrl()));
+}
+return true;
+}
+}
+class APIAuth implements MiddlewareInterface
+{
+public function handle(): bool
+{
+if (!AuthUtil::isUserLoggedIn()) {
+throw new He5Exception("Access denied. User not logged in.", 0, 401);
+}
+return true;
+}
+}
+Custom Middleware
+class CustomMiddleware implements MiddlewareInterface
+{
+public function handle(): bool
+{
+// Your middleware logic
+if ($someCondition) {
+throw new He5Exception("Access denied", 403, 403);
+}
+return true;
+}
+}
+3. Middleware Usage
+// Single middleware
+$router->post('api/data', [$controller, 'method'], [$authMiddleware]);
+11
+// Multiple middleware
+$router->post('api/data', [$controller, 'method'], [$authMiddleware, $validationMiddleware, Authentication & Authorization
+1. Session Management
+class AuthUtil
+{
+public static function isUserLoggedIn(): bool
+public static function validateSessionData(int $sessionId, string $reference, int $userIpublic static function generateAuthCode(string $authuri): string
+public static function isWhilistedRedirect(string $redirectURL): bool
+}
+2. User Authentication
+// Check if user is logged in
+if (AuthUtil::isUserLoggedIn()) {
+$userId = Router::getInstance()->getUserId();
+$sessionId = Router::getInstance()->getSessionId();
+}
+// Generate auth token for external apps
+$authToken = AuthUtil::generateAuthCode($redirectUrl);
+Database Integration
+1. Database Connection
+// Automatic connection via Router
+$db = Router::DB();
+// Manual connection
+$pdo = new PDO("mysql:host=".DB_HOST.";dbname=".DB_NAME, DB_USERNAME, DB_PASSWORD);
+2. Database Operations
+// Prepared statements
+$stmt = Router::DB()->prepare("SELECT * FROM users WHERE id = :id");
+$stmt->execute(['id' => $userId]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
+12
+// Transactions
+Router::DB()->beginTransaction();
+try {
+// Database operations
+Router::DB()->commit();
+} catch (Exception $e) {
+Router::DB()->rollBack();
+throw $e;
+}
+3. Database Utilities
+// Get last insert ID
+$lastId = Router::DB()->lastInsertId();
+// Check if in transaction
+if (Router::DB()->inTransaction()) {
+// Handle transaction
+}
+View System
+1. View Class
+class View
+{
+private string $viewsPath;
+public function __construct(string $viewsPath)
+public function render(string $template, array $data = []): void
+}
+2. Template Rendering
+// In controller
+public function dashboardPage(): void
+{
+$data = [
+'user' => $this->getUserData(),
+'title' => 'Dashboard'
+];
+Router::getInstance()->getView()->render('dashboard', $data);
+}
+13
+3. Template Structure
+<!-- dashboard.php -->
+<!DOCTYPE html>
+<html>
+<head>
+<title><?php echo htmlspecialchars($title); ?></title>
+</head>
+<body>
+<h1>Welcome, <?php echo htmlspecialchars($user['name']); ?></h1>
+</body>
+</html>
+Security Features
+1. CSRF Protection
+// Automatic CSRF token generation
+$csrfToken = Router::getInstance()->generateCsrfToken();
+// CSRF validation (automatic for API routes)
+// Disable CSRF for specific routes
+$router->post('api/public', [$controller, 'method'], [], [], true);
+2. Input Validation
+// Parameter validation
+$params = [
+"email" => new Param(Security::STRING_REGEX, true, Security::MAIL_ID_LENGTH),
+"password" => new Param(Security::PASSWORD_REGEX, true, 100, true),
+"age" => new Param(Security::INT_VALUE, false, 3)
+];
+3. Encryption Utilities
+class He5ED
+{
+public static function encryptData(string $data, string $key): string
+public static function decryptData(string $encryptedData, string $key): string
+public static function encryptDataForURL(string $data, string $key): string
+public static function decryptDataFromURL(string $encryptedData, string $key): string
+public static function deterministicEncrypt(string $plaintext, string $key): string
+public static function deterministicDecrypt(string $ciphertext, string $key): string
+public static function decryptWithPrivateKey($encryptedData, $privateKey): ?string
+}
+14
+Logging System
+1. Logger Class
+class Logger
+{
+public function __construct(string $logsPath = "")
+public function info(string $message, array $context = []): void
+public function error(string $message, array $context = []): void
+public function warning(string $message, array $context = []): void
+public function debug(string $message, array $context = []): void
+public function setRequestId(string $requestId): void
+public function logAccess(string $method, string $uri, int $statusCode, float $responseT}
+2. Logger Types and Features
+A. Application Logger Purpose: Logs application events, errors, and
+debug information Location: logs/YYYY-MM-DD/application.log Format:
+JSON with structured data
+// Usage
+Router::LOGGER()->info("User logged in successfully", ['user_id' => 123]);
+Router::LOGGER()->error("Database connection failed", ['error' => $e->getMessage()]);
+Router::LOGGER()->warning("Invalid input provided", ['input' => $userInput]);
+Router::LOGGER()->debug("Processing request", ['request_id' => $reqId]);
+Log Entry Format:
+{
+"timestamp": "2024-01-15 10:30:45",
+"reQid": "req-12345-abc",
+"level": "INFO",
+"class": "UserController",
+"method": "login",
+"message": "User logged in successfully",
+"context": {"user_id": 123}
+}
+B. Access Logger Purpose: Logs HTTP requests and responses Location:
+logs/YYYY-MM-DD/access.log Format: JSON with request details
+// Automatic logging by framework
+// Manual logging
+Router::LOGGER()->logAccess('POST', '/api/users', 200, 0.125, 'Mozilla/5.0...', '192.168.1.1Log Entry Format:
+15
+{
+"timestamp": "2024-01-15 10:30:45",
+"request_id": "req-12345-abc",
+"method": "POST",
+"uri": "/api/users",
+"status_code": 200,
+"response_time_ms": 125.5,
+"user_agent": "Mozilla/5.0...",
+"ip_address": "192.168.1.1"
+}
+3. Log Levels and Usage
+A. INFO Level Purpose: General application flow information
+Router::LOGGER()->info("User created successfully", ['user_id' => $userId]);
+Router::LOGGER()->info("File uploaded", ['filename' => $filename, 'size' => $fileSize]);
+B. ERROR Level Purpose: Error conditions that need attention
+Router::LOGGER()->error("Database connection failed", ['error' => $e->getMessage()]);
+Router::LOGGER()->error("File upload failed", ['error' => $uploadError]);
+C. WARNING Level Purpose: Warning conditions that might need attention
+Router::LOGGER()->warning("Invalid input provided", ['input' => $userInput]);
+Router::LOGGER()->warning("Rate limit exceeded", ['ip' => $clientIp]);
+D. DEBUG Level Purpose: Debug information for development
+Router::LOGGER()->debug("Processing request", ['request_data' => $requestData]);
+Router::LOGGER()->debug("Database query executed", ['query' => $sql, 'params' => $params]);
+4. Logger Configuration
+A. Enable/Disable Logging
+// Enable logging
+$logger = new Logger('/path/to/logs');
+// Disable logging (empty path)
+$logger = new Logger('');
+B. Log Directory Structure
+logs/
+ 2024-01-15/
+  access.log
+16
+  application.log
+ 2024-01-16/
+  access.log
+  application.log
+ ...
+C. Performance Features
+• Buffered Logging: Logs are buffered and written in batches
+• Automatic Rotation: Daily log rotation
+• Immediate Error Logging: Error logs are written immediately
+• Request ID Tracking: Each request gets a unique ID
+5. Logging Best Practices
+A. Contextual Logging
+// Good: Include context
+Router::LOGGER()->info("User action", [
+'user_id' => $userId,
+'action' => 'login',
+'ip' => $clientIp,
+'timestamp' => time()
+]);
+// Bad: No context
+Router::LOGGER()->info("User action");
+B. Error Logging
+try {
+// Your code
+} catch (Exception $e) {
+Router::LOGGER()->error("Operation failed", [
+'error' => $e->getMessage(),
+'file' => $e->getFile(),
+'line' => $e->getLine(),
+'trace' => $e->getTraceAsString()
+]);
+throw $e;
+}
+C. Performance Logging
+$startTime = microtime(true);
+// Your operation
+$endTime = microtime(true);
+17
+$duration = $endTime - $startTime;
+Router::LOGGER()->info("Operation completed", [
+'duration_ms' => round($duration * 1000, 2),
+'operation' => 'database_query'
+]);
+6. Log Analysis and Monitoring
+A. Log Parsing Script
+<?php
+// parse_logs.php
+function parseApplicationLogs($logFile) {
+$logs = [];
+$lines = file($logFile, FILE_IGNORE_NEW_LINES);
+foreach ($lines as $line) {
+$logEntry = json_decode($line, true);
+if ($logEntry) {
+$logs[] = $logEntry;
+}
+}
+return $logs;
+}
+// Usage
+$logs = parseApplicationLogs('logs/2024-01-15/application.log');
+foreach ($logs as $log) {
+if ($log['level'] === 'ERROR') {
+echo "Error: " . $log['message'] . "\n";
+}
+}
+B. Log Monitoring
+# Monitor errors in real-time
+tail -f logs/$(date +%Y-%m-%d)/application.log | grep '"level":"ERROR"'
+# Count errors by hour
+grep '"level":"ERROR"' logs/2024-01-15/application.log | cut -d'"' -f4 | sort | uniq -c
+# Monitor access logs
+tail -f logs/$(date +%Y-%m-%d)/access.log | jq '.status_code, .uri, .response_time_ms'
+18
+7. Production Logging Configuration
+A. Log Rotation
+# /etc/logrotate.d/he5-framework
+/path/to/your/app/logs/*/*.log {
+daily
+missingok
+rotate 30
+compress
+delaycompress
+notifempty
+create 644 www-data www-data
+}
+B. Log Monitoring with External Tools
+# Filebeat configuration for ELK Stack
+filebeat.inputs:
+- type: log
+enabled: true
+paths:
+- /path/to/your/app/logs/*/*.log
+json.keys_under_root: true
+json.add_error_key: true
+File Upload System
+1. File Upload Handling
+Important: The framework handles FormData differently than regular parameters.
+class FileUploadController
+{
+public static function uploadFile(): array
+{
+try {
+// Handle file (must use $_FILES directly)
+if (!isset($_FILES['file']) || $_FILES['file']['error'] !== UPLOAD_ERR_OK) {
+throw new He5Exception("No file uploaded");
+}
+$file = $_FILES['file'];
+$fileContent = file_get_contents($file['tmp_name']);
+19
+// Handle regular parameters using framework method
+$fullName = He5::getParamValue('fullName');
+$email = He5::getParamValue('email');
+// Store in MySQL
+$db = Router::DB();
+$stmt = $db->prepare("
+INSERT INTO uploaded_files
+(full_name, email, original_name, file_size, mime_type, file_content, uploadVALUES (?, ?, ?, ?, ?, ?, ?)
+");
+$stmt->execute([
+$fullName,
+$email,
+$file['name'],
+$file['size'],
+$file['type'],
+$fileContent,
+date('Y-m-d H:i:s')
+]);
+$fileId = $db->lastInsertId();
+return [
+ResponseConstants::SUCCESS => true,
+ResponseConstants::MESSAGE => "File uploaded successfully",
+'file_id' => $fileId
+];
+} catch (He5Exception $e) {
+Router::LOGGER()->error("File upload error: " . $e->getMessage());
+throw $e;
+}
+}
+}
+2. Route Setup for File Uploads
+// File upload route - NO parameter validation for 'file'
+$router->post('/upload', [FileUploadController::class, 'uploadFile'], [], [
+'fullName' => new Param(Security::STRING_REGEX, true, 255),
+'email' => new Param(Security::STRING_REGEX, true, 255)
+// Note: 'file' is NOT in validation array - handled separately
+]);
+20
+3. Frontend FormData Usage
+<form id="uploadForm" enctype="multipart/form-data">
+<input type="text" name="fullName" id="fullName" placeholder="Full Name" required>
+<input type="email" name="email" id="email" placeholder="Email" required>
+<input type="file" name="file" id="file" required>
+<button type="submit">Upload</button>
+</form>
+<script>
+document.getElementById('uploadForm').addEventListener('submit', async function(e) {
+e.preventDefault();
+const formData = new FormData();
+formData.append('fullName', document.getElementById('fullName').value);
+formData.append('email', document.getElementById('email').value);
+formData.append('file', document.getElementById('file').files[0]);
+try {
+const response = await fetch('/upload', {
+method: 'POST',
+body: formData,
+headers: {
+'X-CSRF-Token': 'your-csrf-token-here'
+}
+});
+const result = await response.json();
+console.log('Upload result:', result);
+} catch (error) {
+console.error('Upload error:', error);
+}
+});
+</script>
+4. File Utilities
+// Using He5FilesUtil for file operations
+$uploadPath = He5FilesUtil::saveUploadedFile($_FILES['file'], 'uploads/', 'custom_filename.j$fileInfo = He5FilesUtil::getFileInfo($uploadPath);
+$isValidSize = He5FilesUtil::validateFileSize($_FILES['file']['size'], 10 * 1024 * 1024); //$isValidType = He5FilesUtil::validateFileType($_FILES['file']['tmp_name'], ['image/jpeg', 'i21
+API Development
+1. API Controller Structure
+class ApiController
+{
+public function getData(): array
+{
+try {
+// Your business logic
+$data = $this->fetchData();
+return [
+'success' => true,
+'data' => $data,
+'message' => 'Data retrieved successfully'
+];
+} catch (He5Exception $e) {
+throw $e; // Let framework handle the response
+}
+}
+}
+2. API Response Format
+{
+"success": true,
+"data": {...},
+"message": "Operation successful"
+}
+3. Error Response Format
+{
+"success": false,
+"error_code": 400,
+"error": "Error message"
+}
+4. Parameter Handling
+// Get parameters
+$email = He5::getParam('email');
+$userId = He5::getParam('user_id');
+$allParams = He5::getParamArray();
+// File uploads
+$uploadedFile = $_FILES['file'];
+22
+Best Practices
+1. Controller Organization
+class UserController
+{
+// Page methods (return void, render views)
+public function dashboardPage(): void
+{
+$data = $this->getDashboardData();
+Router::getInstance()->getView()->render('dashboard', $data);
+}
+// API methods (return arrays)
+public function getUser(): array
+{
+$userId = He5::getParam('id');
+$user = $this->getUserById($userId);
+return [
+'success' => true,
+'data' => $user
+];
+}
+}
+2. Error Handling
+try {
+// Your business logic
+$result = $this->processData();
+return ['success' => true, 'data' => $result];
+} catch (He5Exception $e) {
+throw $e; // Re-throw framework exceptions
+} catch (Exception $e) {
+Router::LOGGER()->error("Unexpected error: " . $e->getMessage());
+throw new He5Exception("Internal server error", 500, 500);
+}
+3. Database Best Practices
+// Use transactions for multiple operations
+Router::DB()->beginTransaction();
+try {
+$stmt1 = Router::DB()->prepare("INSERT INTO table1 ...");
+23
+$stmt1->execute($params1);
+$stmt2 = Router::DB()->prepare("INSERT INTO table2 ...");
+$stmt2->execute($params2);
+Router::DB()->commit();
+} catch (Exception $e) {
+Router::DB()->rollBack();
+throw $e;
+}
+4. Security Best Practices
+// Always validate input
+$email = He5::getParam('email');
+if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+throw new He5Exception("Invalid email format", 400, 400);
+}
+// Use prepared statements
+$stmt = Router::DB()->prepare("SELECT * FROM users WHERE email = :email");
+$stmt->execute(['email' => $email]);
+// Sanitize output
+echo htmlspecialchars($userInput);
+Examples
+1. Complete User Management System
+Controller
+class UserController
+{
+public function userListPage(): void
+{
+$users = $this->getAllUsers();
+Router::getInstance()->getView()->render('user-list', ['users' => $users]);
+}
+public function createUser(): array
+{
+$name = He5::getParam('name');
+$email = He5::getParam('email');
+24
+$stmt = Router::DB()->prepare("INSERT INTO users (name, email) VALUES (:name, :email$stmt->execute(['name' => $name, 'email' => $email]);
+return [
+'success' => true,
+'message' => 'User created successfully',
+'user_id' => Router::DB()->lastInsertId()
+];
+}
+public function getUser(): array
+{
+$userId = He5::getParam('id');
+$stmt = Router::DB()->prepare("SELECT * FROM users WHERE id = :id");
+$stmt->execute(['id' => $userId]);
+$user = $stmt->fetch(PDO::FETCH_ASSOC);
+if (!$user) {
+throw new He5Exception("User not found", 404, 404);
+}
+return [
+'success' => true,
+'data' => $user
+];
+}
+}
+Routes
+// Page routes
+$router->addPage("/users", [$userController, 'userListPage'], [$pathLoginAuth]);
+// API routes
+$router->post('api/users', [$userController, 'createUser'], [$apiLoginAuth], $userParams);
+$router->get('api/users/{id}', [$userController, 'getUser'], [$apiLoginAuth]);
+Template (user-list.php)
+<!DOCTYPE html>
+<html>
+<head>
+<title>User List</title>
+</head>
+<body>
+25
+<h1>Users</h1>
+<table>
+<?php foreach ($users as $user): ?>
+<tr>
+<td><?php echo htmlspecialchars($user['name']); ?></td>
+<td><?php echo htmlspecialchars($user['email']); ?></td>
+</tr>
+<?php endforeach; ?>
+</table>
+</body>
+</html>
+2. File Upload System
+class FileController
+{
+public function uploadFile(): array
+{
+if (!isset($_FILES['file'])) {
+throw new He5Exception("No file uploaded", 400, 400);
+}
+$file = $_FILES['file'];
+$uploadPath = 'uploads/' . basename($file['name']);
+if (move_uploaded_file($file['tmp_name'], $uploadPath)) {
+return [
+'success' => true,
+'message' => 'File uploaded successfully',
+'file_path' => $uploadPath
+];
+}
+throw new He5Exception("File upload failed", 500, 500);
+}
+}
+Troubleshooting
+Common Issues
+1. “Router instance not initialized”
+// Solution: Create router instance first
+$router = new Router($viewPath, $logger);
+// Then use Router::getInstance()
+26
+2. CSRF Token Issues
+// Solution: Include CSRF token in requests
+// For AJAX requests, include header:
+// X-CSRF-Token: <?php echo $_SESSION['csrf_token']; ?>
+3. Database Connection Issues
+// Check configuration
+define_once("DB_HOST", '127.0.0.1');
+define_once("DB_NAME", 'your_database');
+define_once("DB_USERNAME", 'username');
+define_once("DB_PASSWORD", 'password');
+4. View Template Not Found
+// Ensure template exists in views directory
+// Check view path in router constructor
+$router = new Router('/path/to/views/', $logger);
+5. FormData Parameter Issues
+// Problem: "Mandatory param missing" with FormData
+// Solution: Don't validate 'file' parameter, handle $_FILES directly
+// Wrong:
+$router->post('/upload', [$controller, 'method'], [], [
+'file' => new Param(Security::STRING_REGEX, true) // This causes issues
+]);
+// Correct:
+$router->post('/upload', [$controller, 'method'], [], [
+'fullName' => new Param(Security::STRING_REGEX, true),
+'email' => new Param(Security::STRING_REGEX, true)
+// Handle 'file' with $_FILES in controller
+]);
+Debug Mode
+// Enable detailed error reporting
+error_reporting(E_ALL);
+ini_set('display_errors', 1);
+// Check logs
+$logger = new Logger(LOGS_PATH);
+$logger->debug("Debug message");
+27
+Conclusion
+The He5 Framework provides a robust foundation for building modern PHP
+applications for He5 internal projects and He5-created services/products. With
+its comprehensive routing system, middleware support, authentication mechanisms, security features, and file handling capabilities, it enables authorized
+developers to create scalable and maintainable web applications.
+Key Points for File Uploads: - Use FormData for file uploads - Handle
+$_FILES directly in controllers - Don’t validate ‘file’ parameter in routes - Use
+parameter validation for text fields only
+ff IMPORTANT LEGAL NOTICE: - This framework is proprietary software for He5 internal use and He5-created services only - Unauthorized access,
+copying, distribution, or modification is strictly prohibited - All rights reserved
+by He5 - Contact internal support for permissions or licensing questions
+This internal documentation covers He5 Framework v1.0.4. For the latest features and updates, contact the internal development team.
+28

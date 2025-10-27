@@ -166,10 +166,12 @@ function jsonResponse($success, $message, $data = null, $httpCode = 200) {
     exit();
 }
 
-// Error reporting settings
+// Error reporting settings - Always disable display_errors for JSON endpoints
 if (DEBUG_MODE) {
     error_reporting(E_ALL);
-    ini_set('display_errors', 1);
+    // Don't display errors in JSON responses, only log them
+    ini_set('display_errors', 0);
+    ini_set('log_errors', 1);
 } else {
     error_reporting(0);
     ini_set('display_errors', 0);
@@ -178,8 +180,10 @@ if (DEBUG_MODE) {
 // Set timezone
 date_default_timezone_set('UTC'); // Change to your timezone
 
-// Set session configuration
-ini_set('session.cookie_httponly', 1);
-ini_set('session.cookie_secure', isset($_SERVER['HTTPS']));
-ini_set('session.use_strict_mode', 1);
+// Set session configuration (only if session hasn't started)
+if (session_status() === PHP_SESSION_NONE) {
+    ini_set('session.cookie_httponly', 1);
+    ini_set('session.cookie_secure', isset($_SERVER['HTTPS']));
+    ini_set('session.use_strict_mode', 1);
+}
 ?>

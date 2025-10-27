@@ -1,5 +1,18 @@
 <?php
+// Start output buffering to catch any unexpected output
+ob_start();
+
+// Suppress all PHP warnings and notices for clean JSON output
+error_reporting(0);
+ini_set('display_errors', 0);
+
 session_start();
+
+// Clean any previous output
+if (ob_get_length()) {
+    ob_clean();
+}
+
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: POST, GET, OPTIONS');
@@ -7,20 +20,27 @@ header('Access-Control-Allow-Headers: Content-Type, Authorization');
 
 // Handle preflight requests
 if ($_SERVER['REQUEST_METHOD'] == 'OPTIONS') {
+    ob_end_clean();
     exit(0);
 }
 
 // Debug logging
 error_log("Auth Handler Called - Method: " . $_SERVER['REQUEST_METHOD']);
-error_log("Request Headers: " . json_encode(getallheaders()));
 
 // Include configuration
-require_once 'config.php';
+try {
+    require_once 'config.php';
+} catch (Exception $e) {
+    ob_end_clean();
+    echo json_encode(['success' => false, 'message' => 'Configuration error: ' . $e->getMessage()]);
+    exit();
+}
 
 try {
     $pdo = getDBConnection();
     error_log("Database connection successful");
 } catch(Exception $e) {
+    ob_end_clean();
     error_log("Database connection failed: " . $e->getMessage());
     echo json_encode(['success' => false, 'message' => 'Database connection failed: ' . $e->getMessage()]);
     exit();
@@ -32,6 +52,9 @@ $action = $input['action'] ?? '';
 
 error_log("Action received: " . $action);
 error_log("Input data: " . json_encode($input));
+
+// Clean output buffer before sending JSON
+ob_end_clean();
 
 switch($action) {
     case 'signin':
