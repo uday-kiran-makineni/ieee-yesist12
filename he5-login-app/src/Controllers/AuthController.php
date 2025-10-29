@@ -135,19 +135,26 @@ class AuthController {
             $userId = Router::getInstance()->getUserId();
             $authMethod = Router::getInstance()->getAuthMethod();
             
-            // If using token authentication, invalidate the token
+            // If using token authentication, try to invalidate the token
             if ($authMethod === 'token') {
                 $token = He5::getTokenFromHeaders();
                 if ($token) {
                     $tokenHash = hash('sha256', $token);
-                    // Remove token from database
-                    $stmt = Router::DB()->prepare("DELETE FROM user_sessions WHERE user_id = ? AND session_token = ?");
-                    $stmt->execute([$userId, $tokenHash]);
+                    // Try to remove token from database (graceful handling if table issues)
+                    try {
+                        $stmt = Router::DB()->prepare("DELETE FROM user_sessions WHERE user_id = ? AND session_token = ?");
+                        $stmt->execute([$userId, $tokenHash]);
+                    } catch (Exception $dbError) {
+                        // Log database error but don't fail logout
+                        Router::LOGGER()->warning("Could not remove token from database during logout: " . $dbError->getMessage());
+                    }
                 }
             }
             
-            // Destroy session
-            session_destroy();
+            // Destroy session (if exists)
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                session_destroy();
+            }
             
             Router::LOGGER()->info("User logged out", [
                 'user_id' => $userId,
@@ -161,7 +168,14 @@ class AuthController {
             
         } catch (Exception $e) {
             Router::LOGGER()->error("Logout error: " . $e->getMessage());
-            throw new He5Exception("Logout failed", 500, 500);
+            
+            // For logout, we should still return success even if there are server errors
+            // The client should be able to logout locally
+            return [
+                'success' => true,
+                'message' => 'Logged out (with server warnings)',
+                'warning' => 'Some cleanup operations failed but logout completed'
+            ];
         }
     }
     
