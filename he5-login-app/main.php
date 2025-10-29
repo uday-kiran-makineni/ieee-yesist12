@@ -47,6 +47,7 @@ $router->post('/api/signup', [$authController, 'signup'], [], $signupParams);
 $router->post('/api/signin', [$authController, 'signin'], [], $signinParams);
 $router->post('/api/logout', [$authController, 'logout'], [$apiAuth]);
 $router->get('/api/profile', [$authController, 'getProfile'], [$apiAuth]);
+$router->get('/api/validate-token', [$authController, 'validateToken']); // No auth middleware - validates itself
 
 // Handle the request
 $router->close();

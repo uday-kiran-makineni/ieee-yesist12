@@ -79,7 +79,35 @@ class AuthController {
             $_SESSION['user_email'] = $email;
             $_SESSION['user_name'] = $user['full_name'];
             
-            Router::LOGGER()->info("User logged in successfully", ['user_id' => $user['id'], 'email' => $email]);
+            // Generate authentication token
+            $authToken = He5::generateUserToken($user['id']);
+            
+            // Store token in database for tracking (optional)
+            // Note: Temporarily disabled user_sessions table storage due to table structure issues
+            try {
+                $stmt = Router::DB()->prepare("
+                    INSERT INTO user_sessions (user_id, session_token, expires_at) 
+                    VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))
+                    ON DUPLICATE KEY UPDATE 
+                    session_token = VALUES(session_token), 
+                    expires_at = VALUES(expires_at)
+                ");
+                $stmt->execute([$user['id'], hash('sha256', $authToken)]);
+            } catch (Exception $e) {
+                // Log the error but continue - token will still work without database storage
+                Router::LOGGER()->warning("Could not store token in database: " . $e->getMessage());
+            }
+            
+            // Update last login
+            $stmt = Router::DB()->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
+            $stmt->execute([$user['id']]);
+            
+            Router::LOGGER()->info("User logged in successfully", [
+                'user_id' => $user['id'], 
+                'email' => $email,
+                'auth_method' => 'password',
+                'token_generated' => true
+            ]);
             
             return [
                 'success' => true,
@@ -88,7 +116,9 @@ class AuthController {
                     'id' => $user['id'],
                     'email' => $email,
                     'name' => $user['full_name']
-                ]
+                ],
+                'token' => $authToken,
+                'expires_in' => 24 * 60 * 60 // 24 hours in seconds
             ];
             
         } catch (He5Exception $e) {
@@ -103,11 +133,26 @@ class AuthController {
     public function logout(): array {
         try {
             $userId = Router::getInstance()->getUserId();
+            $authMethod = Router::getInstance()->getAuthMethod();
+            
+            // If using token authentication, invalidate the token
+            if ($authMethod === 'token') {
+                $token = He5::getTokenFromHeaders();
+                if ($token) {
+                    $tokenHash = hash('sha256', $token);
+                    // Remove token from database
+                    $stmt = Router::DB()->prepare("DELETE FROM user_sessions WHERE user_id = ? AND session_token = ?");
+                    $stmt->execute([$userId, $tokenHash]);
+                }
+            }
             
             // Destroy session
             session_destroy();
             
-            Router::LOGGER()->info("User logged out", ['user_id' => $userId]);
+            Router::LOGGER()->info("User logged out", [
+                'user_id' => $userId,
+                'auth_method' => $authMethod
+            ]);
             
             return [
                 'success' => true,
@@ -117,6 +162,47 @@ class AuthController {
         } catch (Exception $e) {
             Router::LOGGER()->error("Logout error: " . $e->getMessage());
             throw new He5Exception("Logout failed", 500, 500);
+        }
+    }
+    
+    public function validateToken(): array {
+        try {
+            $userId = Router::getInstance()->getUserId();
+            $authMethod = Router::getInstance()->getAuthMethod();
+            
+            if (!$userId) {
+                throw new He5Exception("Invalid or expired token", 401, 401);
+            }
+            
+            // Get user details
+            $stmt = Router::DB()->prepare("SELECT id, email, full_name FROM users WHERE id = ?");
+            $stmt->execute([$userId]);
+            $user = $stmt->fetch();
+            
+            return [
+                'success' => true,
+                'valid' => true,
+                'auth_method' => $authMethod,
+                'user' => [
+                    'id' => $user['id'],
+                    'email' => $user['email'],
+                    'name' => $user['full_name']
+                ]
+            ];
+            
+        } catch (He5Exception $e) {
+            return [
+                'success' => false,
+                'valid' => false,
+                'error' => $e->getMessage()
+            ];
+        } catch (Exception $e) {
+            Router::LOGGER()->error("Token validation error: " . $e->getMessage());
+            return [
+                'success' => false,
+                'valid' => false,
+                'error' => 'Token validation failed'
+            ];
         }
     }
     

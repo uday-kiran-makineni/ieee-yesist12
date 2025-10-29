@@ -95,6 +95,94 @@ class He5 {
         $input = json_decode(file_get_contents('php://input'), true);
         return $input ?? $_POST ?? $_GET ?? [];
     }
+    
+    // Token Management Functions
+    public static function generateUserToken(int $userId): string {
+        $payload = [
+            'user_id' => $userId,
+            'issued_at' => time(),
+            'expires_at' => time() + (24 * 60 * 60), // 24 hours
+            'random' => bin2hex(random_bytes(16))
+        ];
+        
+        $payloadJson = json_encode($payload);
+        $encodedPayload = base64_encode($payloadJson);
+        
+        // Create signature using HMAC
+        $signature = hash_hmac('sha256', $encodedPayload, TOKEN_ENCRYPTION_KEY);
+        
+        // Combine payload and signature
+        $token = $encodedPayload . '.' . $signature;
+        
+        return base64_encode($token);
+    }
+    
+    public static function validateUserToken(string $token): ?int {
+        try {
+            // Decode the token
+            $decodedToken = base64_decode($token);
+            $parts = explode('.', $decodedToken);
+            
+            if (count($parts) !== 2) {
+                return null;
+            }
+            
+            [$encodedPayload, $signature] = $parts;
+            
+            // Verify signature
+            $expectedSignature = hash_hmac('sha256', $encodedPayload, TOKEN_ENCRYPTION_KEY);
+            
+            if (!hash_equals($expectedSignature, $signature)) {
+                return null;
+            }
+            
+            // Decode payload
+            $payloadJson = base64_decode($encodedPayload);
+            $payload = json_decode($payloadJson, true);
+            
+            if (!$payload || !isset($payload['user_id'], $payload['expires_at'])) {
+                return null;
+            }
+            
+            // Check expiration
+            if ($payload['expires_at'] < time()) {
+                return null;
+            }
+            
+            return (int)$payload['user_id'];
+            
+        } catch (Exception $e) {
+            return null;
+        }
+    }
+    
+    public static function getTokenFromHeaders(): ?string {
+        // Check Authorization header
+        $headers = getallheaders();
+        if (isset($headers['Authorization'])) {
+            $authHeader = $headers['Authorization'];
+            if (preg_match('/Bearer\s+(.*)$/i', $authHeader, $matches)) {
+                return $matches[1];
+            }
+        }
+        
+        // Check X-Auth-Token header
+        if (isset($headers['X-Auth-Token'])) {
+            return $headers['X-Auth-Token'];
+        }
+        
+        return null;
+    }
+    
+    public static function getUserIdFromToken(): ?int {
+        $token = self::getTokenFromHeaders();
+        
+        if (!$token) {
+            return null;
+        }
+        
+        return self::validateUserToken($token);
+    }
 }
 
 interface MiddlewareInterface {
@@ -281,11 +369,30 @@ class Router {
     }
     
     public function getUserId(): ?int {
+        // First check token-based authentication
+        $tokenUserId = He5::getUserIdFromToken();
+        if ($tokenUserId) {
+            return $tokenUserId;
+        }
+        
+        // Fallback to session-based authentication
         return $_SESSION['user_id'] ?? null;
     }
     
     public function hasUserCredentials(): bool {
+        // Check token-based authentication first
+        $tokenUserId = He5::getUserIdFromToken();
+        if ($tokenUserId) {
+            return true;
+        }
+        
+        // Fallback to session-based authentication
         return isset($_SESSION['user_id']) && !empty($_SESSION['user_id']);
+    }
+    
+    public function getAuthMethod(): string {
+        $tokenUserId = He5::getUserIdFromToken();
+        return $tokenUserId ? 'token' : 'session';
     }
 }
 

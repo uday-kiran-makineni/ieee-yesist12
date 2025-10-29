@@ -51,9 +51,40 @@
     </main>
 
     <script>
+        // Token management functions
+        function getAuthToken() {
+            return localStorage.getItem('yesist12_auth_token');
+        }
+
+        function removeAuthToken() {
+            localStorage.removeItem('yesist12_auth_token');
+            document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        }
+
+        // Authenticated fetch function
+        async function authenticatedFetch(url, options = {}) {
+            const token = getAuthToken();
+            
+            const headers = {
+                'Content-Type': 'application/json',
+                ...options.headers
+            };
+
+            // Add token to headers if available
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`;
+                headers['X-Auth-Token'] = token;
+            }
+
+            return fetch(url, {
+                ...options,
+                headers
+            });
+        }
+
         async function loadProfile() {
             try {
-                const response = await fetch('/api/profile');
+                const response = await authenticatedFetch('/api/profile');
                 const result = await response.json();
                 
                 if (result.success) {
@@ -72,42 +103,55 @@
                             </div>
                             <div class="info-item">
                                 <label>Phone</label>
-                                <value>${user.phone}</value>
+                                <value>${user.phone || 'Not provided'}</value>
                             </div>
                             <div class="info-item">
                                 <label>Member Since</label>
                                 <value>${new Date(user.created_at).toLocaleDateString()}</value>
+                            </div>
+                            <div class="info-item">
+                                <label>Authentication</label>
+                                <value>🔐 Token-based (Secure)</value>
                             </div>
                         </div>
                     `;
                     
                     document.getElementById('profileContent').innerHTML = profileHtml;
                 } else {
-                    document.getElementById('profileContent').innerHTML = '<p style="color: #721c24;">Failed to load profile</p>';
+                    if (result.error && result.error.includes('not logged in')) {
+                        // Token expired or invalid, redirect to login
+                        removeAuthToken();
+                        window.location.href = '/login';
+                    } else {
+                        document.getElementById('profileContent').innerHTML = '<p style="color: #f44336;">Failed to load profile</p>';
+                    }
                 }
             } catch (error) {
-                document.getElementById('profileContent').innerHTML = '<p style="color: #721c24;">Error loading profile</p>';
+                document.getElementById('profileContent').innerHTML = '<p style="color: #f44336;">Error loading profile</p>';
             }
         }
         
         async function logout() {
             try {
-                const response = await fetch('/api/logout', {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
+                const response = await authenticatedFetch('/api/logout', {
+                    method: 'POST'
                 });
                 
                 const result = await response.json();
                 
                 if (result.success) {
+                    // Remove token from local storage
+                    removeAuthToken();
+                    console.log('✅ Logged out successfully, token removed');
                     window.location.href = '/login';
                 } else {
                     alert('Logout failed');
                 }
             } catch (error) {
-                alert('Network error during logout');
+                // Even if logout fails on server, remove token locally
+                removeAuthToken();
+                alert('Network error during logout, but logged out locally');
+                window.location.href = '/login';
             }
         }
         

@@ -474,6 +474,22 @@
             }
         }
 
+        // Token management functions
+        function storeAuthToken(token) {
+            localStorage.setItem('yesist12_auth_token', token);
+            // Also set a cookie for server-side access if needed
+            document.cookie = `auth_token=${token}; path=/; max-age=${24*60*60}; SameSite=Strict`;
+        }
+
+        function getAuthToken() {
+            return localStorage.getItem('yesist12_auth_token');
+        }
+
+        function removeAuthToken() {
+            localStorage.removeItem('yesist12_auth_token');
+            document.cookie = 'auth_token=; path=/; expires=Thu, 01 Jan 1970 00:00:01 GMT;';
+        }
+
         // Sign In Form Handler
         document.getElementById('signinForm').addEventListener('submit', async function(e) {
             e.preventDefault();
@@ -501,6 +517,13 @@
                 const result = await response.json();
 
                 if (result.success) {
+                    // Store the authentication token
+                    if (result.token) {
+                        storeAuthToken(result.token);
+                        console.log('✅ Authentication token stored successfully');
+                        console.log('🔐 Token expires in:', result.expires_in, 'seconds');
+                    }
+                    
                     showAlert('Sign in successful! Redirecting...', 'success');
                     setTimeout(() => {
                         window.location.href = '/dashboard';
