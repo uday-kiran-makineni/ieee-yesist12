@@ -82,21 +82,15 @@ class AuthController {
             // Generate authentication token
             $authToken = He5::generateUserToken($user['id']);
             
-            // Store token in database for tracking (optional)
-            // Note: Temporarily disabled user_sessions table storage due to table structure issues
-            try {
-                $stmt = Router::DB()->prepare("
-                    INSERT INTO user_sessions (user_id, session_token, expires_at) 
-                    VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))
-                    ON DUPLICATE KEY UPDATE 
-                    session_token = VALUES(session_token), 
-                    expires_at = VALUES(expires_at)
-                ");
-                $stmt->execute([$user['id'], hash('sha256', $authToken)]);
-            } catch (Exception $e) {
-                // Log the error but continue - token will still work without database storage
-                Router::LOGGER()->warning("Could not store token in database: " . $e->getMessage());
-            }
+            // Store token in database for tracking
+            $stmt = Router::DB()->prepare("
+                INSERT INTO user_sessions (user_id, session_token, expires_at) 
+                VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))
+                ON DUPLICATE KEY UPDATE 
+                session_token = VALUES(session_token), 
+                expires_at = VALUES(expires_at)
+            ");
+            $stmt->execute([$user['id'], hash('sha256', $authToken)]);
             
             // Update last login
             $stmt = Router::DB()->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
@@ -135,19 +129,14 @@ class AuthController {
             $userId = Router::getInstance()->getUserId();
             $authMethod = Router::getInstance()->getAuthMethod();
             
-            // If using token authentication, try to invalidate the token
+            // If using token authentication, invalidate the token
             if ($authMethod === 'token') {
                 $token = He5::getTokenFromHeaders();
                 if ($token) {
                     $tokenHash = hash('sha256', $token);
-                    // Try to remove token from database (graceful handling if table issues)
-                    try {
-                        $stmt = Router::DB()->prepare("DELETE FROM user_sessions WHERE user_id = ? AND session_token = ?");
-                        $stmt->execute([$userId, $tokenHash]);
-                    } catch (Exception $dbError) {
-                        // Log database error but don't fail logout
-                        Router::LOGGER()->warning("Could not remove token from database during logout: " . $dbError->getMessage());
-                    }
+                    // Remove token from database
+                    $stmt = Router::DB()->prepare("DELETE FROM user_sessions WHERE user_id = ? AND session_token = ?");
+                    $stmt->execute([$userId, $tokenHash]);
                 }
             }
             

@@ -1,13 +1,8 @@
 @echo off
-echo Starting He5 Login Application Setup...
+echo Starting He5 Login Application with MySQL Support...
 echo.
 
-REM Setup database
-echo Setting up database...
-php setup_database.php
-echo.
-
-REM Start PHP development server
+REM Start PHP development server with php.ini
 echo Starting PHP development server...
 echo Server will be available at: http://localhost:8000
 echo.
@@ -21,9 +16,15 @@ echo - POST /api/signup - User registration
 echo - POST /api/signin - User login
 echo - POST /api/logout - User logout
 echo - GET /api/profile - Get user profile
+echo - GET /api/validate-token - Token validation
+echo.
+echo Features:
+echo - Token-based authentication with encrypted user IDs
+echo - Secure HMAC-SHA256 token signatures
+echo - 24-hour token expiration
+echo - Full database integration with PDO MySQL
 echo.
 echo Press Ctrl+C to stop the server
 echo.
 
-cd public_html
-php -S localhost:8000
+php -c php.ini -S localhost:8000 main.php
