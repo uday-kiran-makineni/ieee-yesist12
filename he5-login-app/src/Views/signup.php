@@ -232,7 +232,7 @@
                         window.location.href = '/login';
                     }, 2000);
                 } else {
-                    messageDiv.innerHTML = '<div class="message error">' + result.error + '</div>';
+                    messageDiv.innerHTML = '<div class="message error">' + (result.message || result.error || 'Signup failed') + '</div>';
                 }
             } catch (error) {
                 messageDiv.innerHTML = '<div class="message error">Network error. Please try again.</div>';

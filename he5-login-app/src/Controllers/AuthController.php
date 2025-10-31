@@ -1,237 +1,225 @@
 <?php
+
+/**
+ * AuthController - IEEE YESIST12 Authentication System
+ * 
+ * Uses He5 Framework PHAR file for He5ED encryption and other utilities
+ * 
+ * @requires He5-Frame-work-1.0.3.phar
+ * @uses He5ED - Encryption/Decryption class from He5 Framework
+ * @uses TOKEN_ENCRYPTION_KEY - Encryption key from config.php
+ */
+
+// Import He5 Framework classes
+require_once __DIR__ . '/../../He5-Frame-work-1.0.3.phar';
+require_once __DIR__ . '/../../config.php';
+
+// Include stubs for IDE support (actual classes come from PHAR)
+require_once __DIR__ . '/../../he5_stubs.php';
+
 class AuthController {
     
-    // Page Methods (render views)
-    public function loginPage(): void {
-        $redirect = He5::getParamValue('redirect') ?? SITE_PATH . '/dashboard';
-        Router::getInstance()->getView()->render('login', ['redirect' => $redirect]);
+    public function showLogin() {
+        include __DIR__ . '/../Views/login.php';
     }
     
-
-    
-    public function dashboardPage(): void {
-        Router::getInstance()->getView()->render('dashboard', [
-            'user_id' => Router::getInstance()->getUserId()
-        ]);
+    public function showSignup() {
+        include __DIR__ . '/../Views/signup.php';
     }
     
-    // API Methods (return arrays)
-    public function signup(): array {
+    public function showDashboard() {
+        // Check if user is authenticated
+        if (!$this->isAuthenticated()) {
+            header('Location: /login');
+            exit;
+        }
+        
+        include __DIR__ . '/../Views/dashboard.php';
+    }
+    
+    public function login() {
         try {
-            $email = He5::getParamValue('email');
-            $password = He5::getParamValue('password');
-            $fullName = He5::getParamValue('fullName');
-            $phone = He5::getParamValue('phone');
+            // Get JSON data from request body
+            $input = json_decode(file_get_contents('php://input'), true);
             
-            // Check if user already exists
-            $stmt = Router::DB()->prepare("SELECT id FROM users WHERE email = ?");
+            // Fallback to $_POST if JSON is not available
+            $email = $input['email'] ?? $_POST['email'] ?? '';
+            $password = $input['password'] ?? $_POST['password'] ?? '';
+            
+            // Validate required fields
+            if (empty($email) || empty($password)) {
+                throw new Exception('Email and password are required');
+            }
+            
+            // Find user in database
+            $db = SimpleRouter::DB();
+            $stmt = $db->prepare("SELECT id, email, password, full_name, phone FROM users WHERE email = ?");
             $stmt->execute([$email]);
-            
-            if ($stmt->fetch()) {
-                throw new He5Exception("User already exists with this email", 400, 400);
-            }
-            
-            // Hash password
-            $hashedPassword = password_hash($password, PASSWORD_DEFAULT);
-            
-            // Insert user
-            $stmt = Router::DB()->prepare("
-                INSERT INTO users (email, password, full_name, phone, created_at) 
-                VALUES (?, ?, ?, ?, NOW())
-            ");
-            
-            $stmt->execute([$email, $hashedPassword, $fullName, $phone]);
-            $userId = Router::DB()->lastInsertId();
-            
-            Router::LOGGER()->info("User registered successfully", ['user_id' => $userId, 'email' => $email]);
-            
-            return [
-                'success' => true,
-                'message' => 'Registration successful! Please login.',
-                'user_id' => $userId
-            ];
-            
-        } catch (He5Exception $e) {
-            Router::LOGGER()->error("Signup error: " . $e->getMessage());
-            throw $e;
-        } catch (Exception $e) {
-            Router::LOGGER()->error("Signup unexpected error: " . $e->getMessage());
-            throw new He5Exception("Registration failed. Please try again.", 500, 500);
-        }
-    }
-    
-    public function signin(): array {
-        try {
-            $email = He5::getParamValue('email');
-            $password = He5::getParamValue('password');
-            
-            // Get user
-            $stmt = Router::DB()->prepare("SELECT id, password, full_name FROM users WHERE email = ?");
-            $stmt->execute([$email]);
-            $user = $stmt->fetch();
-            
-            if (!$user || !password_verify($password, $user['password'])) {
-                throw new He5Exception("Invalid email or password", 401, 401);
-            }
-            
-            // Create session
-            $_SESSION['user_id'] = $user['id'];
-            $_SESSION['user_email'] = $email;
-            $_SESSION['user_name'] = $user['full_name'];
-            
-            // Generate authentication token
-            $authToken = He5::generateUserToken($user['id']);
-            
-            // Store token in database for tracking
-            $stmt = Router::DB()->prepare("
-                INSERT INTO user_sessions (user_id, session_token, expires_at) 
-                VALUES (?, ?, DATE_ADD(NOW(), INTERVAL 24 HOUR))
-                ON DUPLICATE KEY UPDATE 
-                session_token = VALUES(session_token), 
-                expires_at = VALUES(expires_at)
-            ");
-            $stmt->execute([$user['id'], hash('sha256', $authToken)]);
-            
-            // Update last login
-            $stmt = Router::DB()->prepare("UPDATE users SET last_login = NOW() WHERE id = ?");
-            $stmt->execute([$user['id']]);
-            
-            Router::LOGGER()->info("User logged in successfully", [
-                'user_id' => $user['id'], 
-                'email' => $email,
-                'auth_method' => 'password',
-                'token_generated' => true
-            ]);
-            
-            return [
-                'success' => true,
-                'message' => 'Login successful!',
-                'user' => [
-                    'id' => $user['id'],
-                    'email' => $email,
-                    'name' => $user['full_name']
-                ],
-                'token' => $authToken,
-                'expires_in' => 24 * 60 * 60 // 24 hours in seconds
-            ];
-            
-        } catch (He5Exception $e) {
-            Router::LOGGER()->error("Signin error: " . $e->getMessage());
-            throw $e;
-        } catch (Exception $e) {
-            Router::LOGGER()->error("Signin unexpected error: " . $e->getMessage());
-            throw new He5Exception("Login failed. Please try again.", 500, 500);
-        }
-    }
-    
-    public function logout(): array {
-        try {
-            $userId = Router::getInstance()->getUserId();
-            $authMethod = Router::getInstance()->getAuthMethod();
-            
-            // If using token authentication, invalidate the token
-            if ($authMethod === 'token') {
-                $token = He5::getTokenFromHeaders();
-                if ($token) {
-                    $tokenHash = hash('sha256', $token);
-                    // Remove token from database
-                    $stmt = Router::DB()->prepare("DELETE FROM user_sessions WHERE user_id = ? AND session_token = ?");
-                    $stmt->execute([$userId, $tokenHash]);
-                }
-            }
-            
-            // Destroy session (if exists)
-            if (session_status() === PHP_SESSION_ACTIVE) {
-                session_destroy();
-            }
-            
-            Router::LOGGER()->info("User logged out", [
-                'user_id' => $userId,
-                'auth_method' => $authMethod
-            ]);
-            
-            return [
-                'success' => true,
-                'message' => 'Logged out successfully'
-            ];
-            
-        } catch (Exception $e) {
-            Router::LOGGER()->error("Logout error: " . $e->getMessage());
-            
-            // For logout, we should still return success even if there are server errors
-            // The client should be able to logout locally
-            return [
-                'success' => true,
-                'message' => 'Logged out (with server warnings)',
-                'warning' => 'Some cleanup operations failed but logout completed'
-            ];
-        }
-    }
-    
-    public function validateToken(): array {
-        try {
-            $userId = Router::getInstance()->getUserId();
-            $authMethod = Router::getInstance()->getAuthMethod();
-            
-            if (!$userId) {
-                throw new He5Exception("Invalid or expired token", 401, 401);
-            }
-            
-            // Get user details
-            $stmt = Router::DB()->prepare("SELECT id, email, full_name FROM users WHERE id = ?");
-            $stmt->execute([$userId]);
-            $user = $stmt->fetch();
-            
-            return [
-                'success' => true,
-                'valid' => true,
-                'auth_method' => $authMethod,
-                'user' => [
-                    'id' => $user['id'],
-                    'email' => $user['email'],
-                    'name' => $user['full_name']
-                ]
-            ];
-            
-        } catch (He5Exception $e) {
-            return [
-                'success' => false,
-                'valid' => false,
-                'error' => $e->getMessage()
-            ];
-        } catch (Exception $e) {
-            Router::LOGGER()->error("Token validation error: " . $e->getMessage());
-            return [
-                'success' => false,
-                'valid' => false,
-                'error' => 'Token validation failed'
-            ];
-        }
-    }
-    
-    public function getProfile(): array {
-        try {
-            $userId = Router::getInstance()->getUserId();
-            
-            $stmt = Router::DB()->prepare("SELECT id, email, full_name, phone, created_at FROM users WHERE id = ?");
-            $stmt->execute([$userId]);
             $user = $stmt->fetch();
             
             if (!$user) {
-                throw new He5Exception("User not found", 404, 404);
+                throw new Exception('Invalid email or password');
             }
             
-            return [
-                'success' => true,
-                'data' => $user
+            // Verify password using He5ED decryption only
+            try {
+                /** @noinspection PhpUndefinedClassInspection */
+                $decryptedPassword = He5ED::decryptData($user['password'], TOKEN_ENCRYPTION_KEY);
+                if ($decryptedPassword !== $password) {
+                    throw new Exception('Invalid email or password');
+                }
+            } catch (Exception $e) {
+                throw new Exception('Invalid email or password');
+            }
+            
+            // Create session token using He5ED encryption
+            /** @noinspection PhpUndefinedClassInspection */
+            $sessionToken = He5ED::encryptData(json_encode([
+                'user_id' => $user['id'],
+                'email' => $user['email'],
+                'created_at' => time()
+            ]), TOKEN_ENCRYPTION_KEY);
+            
+            // Start session and store data
+            session_start();
+            $_SESSION['auth_token'] = $sessionToken;
+            $_SESSION['user_data'] = [
+                'id' => $user['id'],
+                'email' => $user['email'],
+                'full_name' => $user['full_name'],
+                'phone' => $user['phone']
             ];
             
-        } catch (He5Exception $e) {
-            throw $e;
+            // Return JSON response
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'message' => 'Login successful',
+                'token' => $sessionToken,
+                'expires_in' => 3600, // 1 hour
+                'redirect' => '/dashboard'
+            ]);
+            
         } catch (Exception $e) {
-            Router::LOGGER()->error("Get profile error: " . $e->getMessage());
-            throw new He5Exception("Failed to get profile", 500, 500);
+            header('Content-Type: application/json');
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => $e->getMessage()
+            ]);
         }
+    }
+    
+    public function signup() {
+        try {
+            // Get JSON data from request body
+            $input = json_decode(file_get_contents('php://input'), true);
+            
+            // Fallback to $_POST if JSON is not available
+            $email = $input['email'] ?? $_POST['email'] ?? '';
+            $password = $input['password'] ?? $_POST['password'] ?? '';
+            $fullName = $input['fullName'] ?? $_POST['fullName'] ?? '';
+            $phone = $input['phone'] ?? $_POST['phone'] ?? '';
+            
+            // Validate required fields
+            if (empty($email) || empty($password) || empty($fullName) || empty($phone)) {
+                throw new Exception('All fields are required');
+            }
+            
+            // Check if user already exists and create user
+            $db = SimpleRouter::DB();
+            
+            // Check if user exists
+            $stmt = $db->prepare("SELECT id FROM users WHERE email = ?");
+            $stmt->execute([$email]);
+            if ($stmt->fetch()) {
+                throw new Exception('User with this email already exists');
+            }
+            
+            // Encrypt password using He5ED encryption
+            /** @noinspection PhpUndefinedClassInspection */
+            $encryptedPassword = He5ED::encryptData($password, TOKEN_ENCRYPTION_KEY);
+            
+            // Insert new user
+            $stmt = $db->prepare("INSERT INTO users (email, password, full_name, phone, created_at) VALUES (?, ?, ?, ?, NOW())");
+            $stmt->execute([$email, $encryptedPassword, $fullName, $phone]);
+            $userId = $db->lastInsertId();
+            
+            // Create session token using He5ED encryption
+            /** @noinspection PhpUndefinedClassInspection */
+            $sessionToken = He5ED::encryptData(json_encode([
+                'user_id' => $userId,
+                'email' => $email,
+                'created_at' => time()
+            ]), TOKEN_ENCRYPTION_KEY);
+            
+            // Start session and store data
+            session_start();
+            $_SESSION['auth_token'] = $sessionToken;
+            $_SESSION['user_data'] = [
+                'id' => $userId,
+                'email' => $email,
+                'full_name' => $fullName,
+                'phone' => $phone
+            ];
+            
+            // Return JSON response
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'message' => 'Registration successful',
+                'token' => $sessionToken,
+                'expires_in' => 3600, // 1 hour
+                'redirect' => '/dashboard'
+            ]);
+            
+        } catch (Exception $e) {
+            header('Content-Type: application/json');
+            http_response_code(400);
+            echo json_encode([
+                'success' => false,
+                'message' => $e->getMessage()
+            ]);
+        }
+    }
+    
+    public function logout() {
+        try {
+            session_start();
+            session_destroy();
+            
+            header('Content-Type: application/json');
+            echo json_encode([
+                'success' => true,
+                'message' => 'Logged out successfully',
+                'redirect' => '/login'
+            ]);
+            
+        } catch (Exception $e) {
+            header('Content-Type: application/json');
+            http_response_code(500);
+            echo json_encode([
+                'success' => false,
+                'message' => 'System error occurred'
+            ]);
+        }
+    }
+    
+    public function apiLogin() {
+        $this->login();
+    }
+    
+    public function apiSignup() {
+        $this->signup();
+    }
+    
+    public function apiLogout() {
+        $this->logout();
+    }
+    
+    private function isAuthenticated() {
+        session_start();
+        return isset($_SESSION['auth_token']) && isset($_SESSION['user_data']);
     }
 }
 ?>

@@ -503,7 +503,7 @@
             const password = formData.get('password');
 
             try {
-                const response = await fetch('/api/signin', {
+                const response = await fetch('/api/login', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -529,7 +529,7 @@
                         window.location.href = '/dashboard';
                     }, 2000);
                 } else {
-                    showAlert(result.error || 'Sign in failed. Please try again.', 'error');
+                    showAlert(result.message || result.error || 'Sign in failed. Please try again.', 'error');
                 }
             } catch (error) {
                 showAlert('Network error. Please try again.', 'error');
@@ -583,7 +583,7 @@
                         switchTab('signin');
                     }, 2000);
                 } else {
-                    showAlert(result.error || 'Registration failed. Please try again.', 'error');
+                    showAlert(result.message || result.error || 'Registration failed. Please try again.', 'error');
                 }
             } catch (error) {
                 showAlert('Network error. Please try again.', 'error');

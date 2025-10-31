@@ -83,74 +83,70 @@
         }
 
         async function loadProfile() {
-            try {
-                const response = await authenticatedFetch('/api/profile');
-                const result = await response.json();
+            <?php
+            session_start();
+            if (isset($_SESSION['user_data'])) {
+                $user = $_SESSION['user_data'];
+                $user_json = json_encode($user);
+                $user_name = htmlspecialchars($user['full_name']);
+                $user_email = htmlspecialchars($user['email']);
+                $user_phone = htmlspecialchars($user['phone'] ?? 'Not provided');
+                $user_id = (int)$user['id'];
                 
-                if (result.success) {
-                    const user = result.data;
-                    document.getElementById('userName').textContent = `Welcome, ${user.full_name}!`;
-                    
-                    const profileHtml = `
-                        <div class="profile-info">
-                            <div class="info-item">
-                                <label>Full Name</label>
-                                <value>${user.full_name}</value>
-                            </div>
-                            <div class="info-item">
-                                <label>Email</label>
-                                <value>${user.email}</value>
-                            </div>
-                            <div class="info-item">
-                                <label>Phone</label>
-                                <value>${user.phone || 'Not provided'}</value>
-                            </div>
-                            <div class="info-item">
-                                <label>Member Since</label>
-                                <value>${new Date(user.created_at).toLocaleDateString()}</value>
-                            </div>
-                            <div class="info-item">
-                                <label>Authentication</label>
-                                <value>🔐 Token-based (Secure)</value>
-                            </div>
+                echo "
+                document.getElementById('userName').textContent = 'Welcome, $user_name!';
+                const profileHtml = `
+                    <div class=\"profile-info\">
+                        <div class=\"info-item\">
+                            <label>Full Name</label>
+                            <value>$user_name</value>
                         </div>
-                    `;
-                    
-                    document.getElementById('profileContent').innerHTML = profileHtml;
-                } else {
-                    if (result.error && result.error.includes('not logged in')) {
-                        // Token expired or invalid, redirect to login
-                        removeAuthToken();
-                        window.location.href = '/login';
-                    } else {
-                        document.getElementById('profileContent').innerHTML = '<p style="color: #f44336;">Failed to load profile</p>';
-                    }
-                }
-            } catch (error) {
-                document.getElementById('profileContent').innerHTML = '<p style="color: #f44336;">Error loading profile</p>';
+                        <div class=\"info-item\">
+                            <label>Email</label>
+                            <value>$user_email</value>
+                        </div>
+                        <div class=\"info-item\">
+                            <label>Phone</label>
+                            <value>$user_phone</value>
+                        </div>
+                        <div class=\"info-item\">
+                            <label>User ID</label>
+                            <value>#$user_id</value>
+                        </div>
+                        <div class=\"info-item\">
+                            <label>Authentication</label>
+                            <value>🔐 He5ED Encrypted (Secure)</value>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('profileContent').innerHTML = profileHtml;
+                ";
+            } else {
+                echo "
+                document.getElementById('profileContent').innerHTML = '<p style=\"color: #f44336;\">Session expired. Please log in again.</p>';
+                setTimeout(() => window.location.href = '/login', 2000);
+                ";
             }
+            ?>
         }
         
         async function logout() {
             try {
-                const response = await authenticatedFetch('/api/logout', {
+                const response = await fetch('/logout', {
                     method: 'POST'
                 });
                 
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Remove token from local storage
-                    removeAuthToken();
-                    console.log('✅ Logged out successfully, token removed');
+                    console.log('✅ Logged out successfully');
                     window.location.href = '/login';
                 } else {
                     alert('Logout failed');
                 }
             } catch (error) {
-                // Even if logout fails on server, remove token locally
-                removeAuthToken();
-                alert('Network error during logout, but logged out locally');
+                alert('Network error during logout');
+                // Even if there's an error, try to redirect to login
                 window.location.href = '/login';
             }
         }

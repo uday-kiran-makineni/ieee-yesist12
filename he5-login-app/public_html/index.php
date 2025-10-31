@@ -2,6 +2,12 @@
 // public_html/index.php
 declare(strict_types=1);
 
+// Handle root route redirect to avoid He5 Framework Router bug
+if ($_SERVER['REQUEST_URI'] === '/' || $_SERVER['REQUEST_URI'] === '') {
+    header('Location: /login');
+    exit;
+}
+
 // Include main application
 include_once __DIR__ . '/../main.php';
 
